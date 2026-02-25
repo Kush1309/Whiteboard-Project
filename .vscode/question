@@ -1,0 +1,42 @@
+Capstone Project Assessment
+Project Title: Real-Time Collaborative Whiteboard (Zoom + Miro
+Type)
+Students are required to build a full-stack real-time collaborative whiteboard application using the
+MERN Stack (MongoDB, Express.js, React.js, Node.js). The application should allow multiple users
+to join a shared room and draw simultaneously with real-time synchronization using WebSockets
+(Socket.io).
+Core Requirements (Mandatory Features)
+• User Authentication using JWT (Register / Login / Logout)
+• Create and Join Whiteboard Rooms via unique Room ID
+• Real-time drawing synchronization using Socket.io
+• Canvas tools: Pencil, Eraser, Clear Board
+• Color picker and brush size selection
+• Room-based multi-user collaboration
+• Chat feature inside whiteboard room
+• Persistent storage of whiteboard sessions in MongoDB
+• Responsive UI using React Hooks (useState, useEffect, useRef)
+Intermediate Features (For Good Grade)
+• Undo / Redo functionality
+• Save whiteboard snapshot as image
+• User presence indicator (who is online)
+• Protected routes in frontend
+• Role-based permissions (Host / Participant)
+• Proper error handling and validation
+Advanced Features (For Excellent Grade)
+• Screen sharing using WebRTC
+• File sharing inside room
+• Session recording
+• Dark/Light mode toggle
+• Full deployment (Frontend + Backend) with working live URL
+Technical Expectations
+• Clean and structured folder architecture (MVC pattern)
+• Environment variables usage (.env)
+• RESTful API design
+• Proper WebSocket event handling
+• Production-ready build
+• GitHub repository with proper README documentation
+Submission Guidelines
+Students must submit:
+• GitHub Repository Link
+• Deployed Application Live URL (Frontend + Backend)
+• Proper README with setup instructions
