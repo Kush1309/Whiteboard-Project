@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Video, VideoOff, Mic, MicOff, PhoneOff, Maximize2, Minimize2 } from 'lucide-react';
 import socketService from '../services/socket';
 
@@ -40,7 +40,7 @@ const VideoCall = ({ roomId, currentUser, users }) => {
         socketService.socket.off('user-video-left', handleUserVideoLeft);
       }
     };
-  }, []);
+  }, [handleVideoOffer, handleVideoAnswer, handleIceCandidate, handleUserVideoJoined, handleUserVideoLeft]);
 
   const startCall = async () => {
     try {
@@ -88,7 +88,7 @@ const VideoCall = ({ roomId, currentUser, users }) => {
     socketService.socket.emit('leave-video', { roomId, userId: currentUser.id });
   };
 
-  const createPeerConnection = async (userId, stream) => {
+  const createPeerConnection = useCallback(async (userId, stream) => {
     const peerConnection = new RTCPeerConnection(configuration);
 
     // Add local stream tracks to peer connection
@@ -131,9 +131,9 @@ const VideoCall = ({ roomId, currentUser, users }) => {
     });
 
     return peerConnection;
-  };
+  }, [roomId]);
 
-  const handleVideoOffer = async ({ offer, fromUserId }) => {
+  const handleVideoOffer = useCallback(async ({ offer, fromUserId }) => {
     if (!localStream) return;
 
     let peerConnection = peerConnections[fromUserId];
@@ -177,29 +177,29 @@ const VideoCall = ({ roomId, currentUser, users }) => {
       answer,
       targetUserId: fromUserId
     });
-  };
+  }, [localStream, peerConnections, roomId]);
 
-  const handleVideoAnswer = async ({ answer, fromUserId }) => {
+  const handleVideoAnswer = useCallback(async ({ answer, fromUserId }) => {
     const peerConnection = peerConnections[fromUserId];
     if (peerConnection) {
       await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
     }
-  };
+  }, [peerConnections]);
 
-  const handleIceCandidate = async ({ candidate, fromUserId }) => {
+  const handleIceCandidate = useCallback(async ({ candidate, fromUserId }) => {
     const peerConnection = peerConnections[fromUserId];
     if (peerConnection) {
       await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
     }
-  };
+  }, [peerConnections]);
 
-  const handleUserVideoJoined = ({ userId }) => {
+  const handleUserVideoJoined = useCallback(({ userId }) => {
     if (userId !== currentUser.id && localStream) {
       createPeerConnection(userId, localStream);
     }
-  };
+  }, [currentUser.id, localStream, createPeerConnection]);
 
-  const handleUserVideoLeft = ({ userId }) => {
+  const handleUserVideoLeft = useCallback(({ userId }) => {
     // Close peer connection
     if (peerConnections[userId]) {
       peerConnections[userId].close();
@@ -216,7 +216,7 @@ const VideoCall = ({ roomId, currentUser, users }) => {
       delete newStreams[userId];
       return newStreams;
     });
-  };
+  }, [peerConnections]);
 
   const toggleVideo = () => {
     if (localStream) {

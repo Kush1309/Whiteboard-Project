@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
+import React, { useRef, useEffect, useState, forwardRef, useImperativeHandle, useCallback } from 'react';
 
 const Canvas = forwardRef(({ tool, color, brushSize, onDrawing, onSave }, ref) => {
   const canvasRef = useRef(null);
@@ -33,7 +33,7 @@ const Canvas = forwardRef(({ tool, color, brushSize, onDrawing, onSave }, ref) =
     // Handle window resize
     window.addEventListener('resize', resizeCanvas);
     return () => window.removeEventListener('resize', resizeCanvas);
-  }, []);
+  }, [saveState]);
 
   useEffect(() => {
     if (contextRef.current) {
@@ -43,14 +43,14 @@ const Canvas = forwardRef(({ tool, color, brushSize, onDrawing, onSave }, ref) =
     }
   }, [tool, color, brushSize]);
 
-  const saveState = () => {
+  const saveState = useCallback(() => {
     const canvas = canvasRef.current;
     const dataURL = canvas.toDataURL();
     const newHistory = history.slice(0, historyStep + 1);
     newHistory.push(dataURL);
     setHistory(newHistory);
     setHistoryStep(newHistory.length - 1);
-  };
+  }, [history, historyStep]);
 
   const getMousePos = (e) => {
     const canvas = canvasRef.current;

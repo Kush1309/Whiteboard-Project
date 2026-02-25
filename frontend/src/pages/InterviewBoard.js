@@ -13,11 +13,6 @@ import {
   Binary,
   Network,
   List,
-  Circle,
-  Square,
-  Triangle,
-  Wand2,
-  Save,
   FileText,
   Maximize,
   Minimize
@@ -25,9 +20,8 @@ import {
 import Canvas from '../components/Canvas';
 
 const InterviewBoard = () => {
-  const { roomId } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user: currentUser } = useAuth();
   
   // Timer state
   const [timerSeconds, setTimerSeconds] = useState(0);
@@ -237,11 +231,6 @@ function linearSearch(arr, target) {
     URL.revokeObjectURL(url);
     
     toast.success('Session downloaded!');
-  };
-
-  const saveAsPDF = () => {
-    toast.success('PDF export feature coming soon!');
-    // This would require a library like jsPDF or html2canvas
   };
 
   const dataStructures = [

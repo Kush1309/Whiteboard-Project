@@ -10,7 +10,7 @@ import Chat from '../components/Chat';
 import UserList from '../components/UserList';
 import VideoCall from '../components/VideoCall';
 import VoiceToText from '../components/VoiceToText';
-import { ArrowLeft, Users, MessageCircle, Settings, Mic } from 'lucide-react';
+import { ArrowLeft, Users, MessageCircle, Mic } from 'lucide-react';
 
 const Whiteboard = () => {
   const { roomId } = useParams();
@@ -40,7 +40,7 @@ const Whiteboard = () => {
         setMessages(response.data.room.chatMessages || []);
 
         // Connect to socket
-        const socket = socketService.connect(token);
+        socketService.connect(token);
         
         // Set up socket event listeners
         setupSocketListeners();

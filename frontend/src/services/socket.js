@@ -155,4 +155,6 @@ class SocketService {
   }
 }
 
-export default new SocketService();
+const SocketService = new SocketService();
+
+export default SocketService;
