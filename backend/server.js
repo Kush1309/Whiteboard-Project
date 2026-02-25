@@ -20,6 +20,7 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
   'https://whiteboard-project-olive.vercel.app',
+  'https://whiteboard-project-kush2.vercel.app',
   process.env.CORS_ORIGIN
 ].filter(Boolean); // Remove undefined values
 
