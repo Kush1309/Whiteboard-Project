@@ -58,8 +58,8 @@ npm run install-deps
 ```
 
 3. Environment Setup:
-   - Copy `.env.example` to `.env` in the backend folder
-   - Update the environment variables with your configuration
+   - Backend: Copy `backend/.env.example` to `backend/.env` and update with your configuration
+   - Frontend: Copy `frontend/.env.example` to `frontend/.env` and update `REACT_APP_SERVER_URL` if needed
 
 4. Start the development servers:
 ```bash
@@ -70,15 +70,25 @@ This will start both the backend server (port 5000) and frontend development ser
 
 ### Environment Variables
 
-Create a `.env` file in the backend directory:
+**Backend (.env in backend folder):**
 
-```
+```env
 NODE_ENV=development
 PORT=5000
 MONGODB_URI=mongodb://localhost:27017/collaborative-whiteboard
 JWT_SECRET=your-jwt-secret-key
 CORS_ORIGIN=http://localhost:3000
 ```
+
+**Frontend (.env in frontend folder):**
+
+```env
+REACT_APP_SERVER_URL=http://localhost:5000
+```
+
+For production deployment:
+- Backend: Update `MONGODB_URI` to your MongoDB Atlas connection string
+- Frontend: Update `REACT_APP_SERVER_URL` to your deployed backend URL (e.g., `https://your-backend.railway.app`)
 
 ## Project Structure
 
