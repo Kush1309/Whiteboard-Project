@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { 
   ArrowLeft, 
@@ -21,7 +20,6 @@ import Canvas from '../components/Canvas';
 
 const InterviewBoard = () => {
   const navigate = useNavigate();
-  const { user: currentUser } = useAuth();
   
   // Timer state
   const [timerSeconds, setTimerSeconds] = useState(0);

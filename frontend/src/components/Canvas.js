@@ -8,6 +8,15 @@ const Canvas = forwardRef(({ tool, color, brushSize, onDrawing, onSave }, ref) =
   const [history, setHistory] = useState([]);
   const [historyStep, setHistoryStep] = useState(-1);
 
+  const saveState = useCallback(() => {
+    const canvas = canvasRef.current;
+    const dataURL = canvas.toDataURL();
+    const newHistory = history.slice(0, historyStep + 1);
+    newHistory.push(dataURL);
+    setHistory(newHistory);
+    setHistoryStep(newHistory.length - 1);
+  }, [history, historyStep]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     const context = canvas.getContext('2d');
@@ -42,15 +51,6 @@ const Canvas = forwardRef(({ tool, color, brushSize, onDrawing, onSave }, ref) =
       contextRef.current.globalCompositeOperation = tool === 'eraser' ? 'destination-out' : 'source-over';
     }
   }, [tool, color, brushSize]);
-
-  const saveState = useCallback(() => {
-    const canvas = canvasRef.current;
-    const dataURL = canvas.toDataURL();
-    const newHistory = history.slice(0, historyStep + 1);
-    newHistory.push(dataURL);
-    setHistory(newHistory);
-    setHistoryStep(newHistory.length - 1);
-  }, [history, historyStep]);
 
   const getMousePos = (e) => {
     const canvas = canvasRef.current;

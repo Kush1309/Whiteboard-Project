@@ -14,12 +14,142 @@ const VideoCall = ({ roomId, currentUser, users }) => {
   const localVideoRef = useRef(null);
   const remoteVideoRefs = useRef({});
 
-  const configuration = {
+  const configuration = useRef({
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:stun1.l.google.com:19302' }
     ]
-  };
+  }).current;
+
+  const createPeerConnection = useCallback(async (userId, stream) => {
+    const peerConnection = new RTCPeerConnection(configuration);
+
+    // Add local stream tracks to peer connection
+    stream.getTracks().forEach(track => {
+      peerConnection.addTrack(track, stream);
+    });
+
+    // Handle incoming tracks
+    peerConnection.ontrack = (event) => {
+      setRemoteStreams(prev => ({
+        ...prev,
+        [userId]: event.streams[0]
+      }));
+    };
+
+    // Handle ICE candidates
+    peerConnection.onicecandidate = (event) => {
+      if (event.candidate) {
+        socketService.socket.emit('ice-candidate', {
+          roomId,
+          candidate: event.candidate,
+          targetUserId: userId
+        });
+      }
+    };
+
+    setPeerConnections(prev => ({
+      ...prev,
+      [userId]: peerConnection
+    }));
+
+    // Create and send offer
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+
+    socketService.socket.emit('video-offer', {
+      roomId,
+      offer,
+      targetUserId: userId
+    });
+
+    return peerConnection;
+  }, [roomId, configuration]);
+
+  const handleVideoOffer = useCallback(async ({ offer, fromUserId }) => {
+    if (!localStream) return;
+
+    let peerConnection = peerConnections[fromUserId];
+    
+    if (!peerConnection) {
+      peerConnection = new RTCPeerConnection(configuration);
+
+      localStream.getTracks().forEach(track => {
+        peerConnection.addTrack(track, localStream);
+      });
+
+      peerConnection.ontrack = (event) => {
+        setRemoteStreams(prev => ({
+          ...prev,
+          [fromUserId]: event.streams[0]
+        }));
+      };
+
+      peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+          socketService.socket.emit('ice-candidate', {
+            roomId,
+            candidate: event.candidate,
+            targetUserId: fromUserId
+          });
+        }
+      };
+
+      setPeerConnections(prev => ({
+        ...prev,
+        [fromUserId]: peerConnection
+      }));
+    }
+
+    await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+    const answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+
+    socketService.socket.emit('video-answer', {
+      roomId,
+      answer,
+      targetUserId: fromUserId
+    });
+  }, [localStream, peerConnections, roomId, configuration]);
+
+  const handleVideoAnswer = useCallback(async ({ answer, fromUserId }) => {
+    const peerConnection = peerConnections[fromUserId];
+    if (peerConnection) {
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+    }
+  }, [peerConnections]);
+
+  const handleIceCandidate = useCallback(async ({ candidate, fromUserId }) => {
+    const peerConnection = peerConnections[fromUserId];
+    if (peerConnection) {
+      await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+    }
+  }, [peerConnections]);
+
+  const handleUserVideoJoined = useCallback(({ userId }) => {
+    if (userId !== currentUser.id && localStream) {
+      createPeerConnection(userId, localStream);
+    }
+  }, [currentUser.id, localStream, createPeerConnection]);
+
+  const handleUserVideoLeft = useCallback(({ userId }) => {
+    // Close peer connection
+    if (peerConnections[userId]) {
+      peerConnections[userId].close();
+      setPeerConnections(prev => {
+        const newPCs = { ...prev };
+        delete newPCs[userId];
+        return newPCs;
+      });
+    }
+
+    // Remove remote stream
+    setRemoteStreams(prev => {
+      const newStreams = { ...prev };
+      delete newStreams[userId];
+      return newStreams;
+    });
+  }, [peerConnections]);
 
   useEffect(() => {
     if (!socketService.socket) return;
@@ -87,136 +217,6 @@ const VideoCall = ({ roomId, currentUser, users }) => {
     // Notify others
     socketService.socket.emit('leave-video', { roomId, userId: currentUser.id });
   };
-
-  const createPeerConnection = useCallback(async (userId, stream) => {
-    const peerConnection = new RTCPeerConnection(configuration);
-
-    // Add local stream tracks to peer connection
-    stream.getTracks().forEach(track => {
-      peerConnection.addTrack(track, stream);
-    });
-
-    // Handle incoming tracks
-    peerConnection.ontrack = (event) => {
-      setRemoteStreams(prev => ({
-        ...prev,
-        [userId]: event.streams[0]
-      }));
-    };
-
-    // Handle ICE candidates
-    peerConnection.onicecandidate = (event) => {
-      if (event.candidate) {
-        socketService.socket.emit('ice-candidate', {
-          roomId,
-          candidate: event.candidate,
-          targetUserId: userId
-        });
-      }
-    };
-
-    setPeerConnections(prev => ({
-      ...prev,
-      [userId]: peerConnection
-    }));
-
-    // Create and send offer
-    const offer = await peerConnection.createOffer();
-    await peerConnection.setLocalDescription(offer);
-
-    socketService.socket.emit('video-offer', {
-      roomId,
-      offer,
-      targetUserId: userId
-    });
-
-    return peerConnection;
-  }, [roomId]);
-
-  const handleVideoOffer = useCallback(async ({ offer, fromUserId }) => {
-    if (!localStream) return;
-
-    let peerConnection = peerConnections[fromUserId];
-    
-    if (!peerConnection) {
-      peerConnection = new RTCPeerConnection(configuration);
-
-      localStream.getTracks().forEach(track => {
-        peerConnection.addTrack(track, localStream);
-      });
-
-      peerConnection.ontrack = (event) => {
-        setRemoteStreams(prev => ({
-          ...prev,
-          [fromUserId]: event.streams[0]
-        }));
-      };
-
-      peerConnection.onicecandidate = (event) => {
-        if (event.candidate) {
-          socketService.socket.emit('ice-candidate', {
-            roomId,
-            candidate: event.candidate,
-            targetUserId: fromUserId
-          });
-        }
-      };
-
-      setPeerConnections(prev => ({
-        ...prev,
-        [fromUserId]: peerConnection
-      }));
-    }
-
-    await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-    const answer = await peerConnection.createAnswer();
-    await peerConnection.setLocalDescription(answer);
-
-    socketService.socket.emit('video-answer', {
-      roomId,
-      answer,
-      targetUserId: fromUserId
-    });
-  }, [localStream, peerConnections, roomId]);
-
-  const handleVideoAnswer = useCallback(async ({ answer, fromUserId }) => {
-    const peerConnection = peerConnections[fromUserId];
-    if (peerConnection) {
-      await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-    }
-  }, [peerConnections]);
-
-  const handleIceCandidate = useCallback(async ({ candidate, fromUserId }) => {
-    const peerConnection = peerConnections[fromUserId];
-    if (peerConnection) {
-      await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-    }
-  }, [peerConnections]);
-
-  const handleUserVideoJoined = useCallback(({ userId }) => {
-    if (userId !== currentUser.id && localStream) {
-      createPeerConnection(userId, localStream);
-    }
-  }, [currentUser.id, localStream, createPeerConnection]);
-
-  const handleUserVideoLeft = useCallback(({ userId }) => {
-    // Close peer connection
-    if (peerConnections[userId]) {
-      peerConnections[userId].close();
-      setPeerConnections(prev => {
-        const newPCs = { ...prev };
-        delete newPCs[userId];
-        return newPCs;
-      });
-    }
-
-    // Remove remote stream
-    setRemoteStreams(prev => {
-      const newStreams = { ...prev };
-      delete newStreams[userId];
-      return newStreams;
-    });
-  }, [peerConnections]);
 
   const toggleVideo = () => {
     if (localStream) {
