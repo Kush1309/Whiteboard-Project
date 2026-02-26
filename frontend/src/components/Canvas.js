@@ -64,9 +64,17 @@ const Canvas = forwardRef(({ tool, color, brushSize, onDrawing, onSave }, ref) =
 
   useEffect(() => {
     if (contextRef.current) {
+      console.log('Updating context styles:', { color, brushSize, tool });
       contextRef.current.strokeStyle = color;
       contextRef.current.lineWidth = brushSize;
       contextRef.current.globalCompositeOperation = tool === 'eraser' ? 'destination-out' : 'source-over';
+      console.log('Context updated:', {
+        strokeStyle: contextRef.current.strokeStyle,
+        lineWidth: contextRef.current.lineWidth,
+        globalCompositeOperation: contextRef.current.globalCompositeOperation
+      });
+    } else {
+      console.error('Context is null when trying to update styles!');
     }
   }, [tool, color, brushSize]);
 
@@ -120,9 +128,24 @@ const Canvas = forwardRef(({ tool, color, brushSize, onDrawing, onSave }, ref) =
   };
 
   const draw = (position) => {
-    if (!isDrawing) return;
+    if (!isDrawing) {
+      console.log('Not drawing - isDrawing is false');
+      return;
+    }
 
     const context = contextRef.current;
+    if (!context) {
+      console.error('Context not available in draw!');
+      return;
+    }
+    
+    console.log('Drawing line from', lastPosition, 'to', position);
+    console.log('Current context settings:', {
+      strokeStyle: context.strokeStyle,
+      lineWidth: context.lineWidth,
+      globalCompositeOperation: context.globalCompositeOperation
+    });
+    
     context.lineTo(position.x, position.y);
     context.stroke();
 
@@ -173,6 +196,7 @@ const Canvas = forwardRef(({ tool, color, brushSize, onDrawing, onSave }, ref) =
   };
 
   const handleMouseMove = (e) => {
+    console.log('Mouse move - isDrawing:', isDrawing);
     const position = getMousePos(e);
     draw(position);
   };
