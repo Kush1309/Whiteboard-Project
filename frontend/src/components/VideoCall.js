@@ -9,10 +9,14 @@ const VideoCall = ({ roomId, currentUser, users }) => {
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isCallActive, setIsCallActive] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [peerConnections, setPeerConnections] = useState({});
+  const [isDragging, setIsDragging] = useState(false);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   
   const localVideoRef = useRef(null);
   const remoteVideoRefs = useRef({});
+  const videoCallRef = useRef(null);
+  const peerConnectionsRef = useRef({});
 
   const configuration = useRef({
     iceServers: [
@@ -22,15 +26,18 @@ const VideoCall = ({ roomId, currentUser, users }) => {
   }).current;
 
   const createPeerConnection = useCallback(async (userId, stream) => {
+    console.log('Creating peer connection for user:', userId);
     const peerConnection = new RTCPeerConnection(configuration);
 
     // Add local stream tracks to peer connection
     stream.getTracks().forEach(track => {
+      console.log('Adding track to peer connection:', track.kind);
       peerConnection.addTrack(track, stream);
     });
 
     // Handle incoming tracks
     peerConnection.ontrack = (event) => {
+      console.log('Received remote track from user:', userId, event.streams[0]);
       setRemoteStreams(prev => ({
         ...prev,
         [userId]: event.streams[0]
@@ -40,6 +47,7 @@ const VideoCall = ({ roomId, currentUser, users }) => {
     // Handle ICE candidates
     peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
+        console.log('Sending ICE candidate to user:', userId);
         socketService.socket.emit('ice-candidate', {
           roomId,
           candidate: event.candidate,
@@ -48,15 +56,18 @@ const VideoCall = ({ roomId, currentUser, users }) => {
       }
     };
 
-    setPeerConnections(prev => ({
-      ...prev,
-      [userId]: peerConnection
-    }));
+    // Handle connection state changes
+    peerConnection.onconnectionstatechange = () => {
+      console.log('Connection state for user', userId, ':', peerConnection.connectionState);
+    };
+
+    peerConnectionsRef.current[userId] = peerConnection;
 
     // Create and send offer
     const offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
 
+    console.log('Sending video offer to user:', userId);
     socketService.socket.emit('video-offer', {
       roomId,
       offer,
@@ -67,19 +78,23 @@ const VideoCall = ({ roomId, currentUser, users }) => {
   }, [roomId, configuration]);
 
   const handleVideoOffer = useCallback(async ({ offer, fromUserId }) => {
-    let peerConnection = peerConnections[fromUserId];
+    console.log('Received video offer from user:', fromUserId);
+    let peerConnection = peerConnectionsRef.current[fromUserId];
     
     if (!peerConnection) {
+      console.log('Creating new peer connection for incoming offer from:', fromUserId);
       peerConnection = new RTCPeerConnection(configuration);
 
       // Add local stream tracks if available (send mode)
       if (localStream) {
         localStream.getTracks().forEach(track => {
+          console.log('Adding local track to peer connection:', track.kind);
           peerConnection.addTrack(track, localStream);
         });
       }
 
       peerConnection.ontrack = (event) => {
+        console.log('Received remote track from user:', fromUserId, event.streams[0]);
         setRemoteStreams(prev => ({
           ...prev,
           [fromUserId]: event.streams[0]
@@ -88,6 +103,7 @@ const VideoCall = ({ roomId, currentUser, users }) => {
 
       peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
+          console.log('Sending ICE candidate to user:', fromUserId);
           socketService.socket.emit('ice-candidate', {
             roomId,
             candidate: event.candidate,
@@ -96,36 +112,51 @@ const VideoCall = ({ roomId, currentUser, users }) => {
         }
       };
 
-      setPeerConnections(prev => ({
-        ...prev,
-        [fromUserId]: peerConnection
-      }));
+      // Handle connection state changes
+      peerConnection.onconnectionstatechange = () => {
+        console.log('Connection state for user', fromUserId, ':', peerConnection.connectionState);
+      };
+
+      peerConnectionsRef.current[fromUserId] = peerConnection;
     }
 
     await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
     const answer = await peerConnection.createAnswer();
     await peerConnection.setLocalDescription(answer);
 
+    console.log('Sending video answer to user:', fromUserId);
     socketService.socket.emit('video-answer', {
       roomId,
       answer,
       targetUserId: fromUserId
     });
-  }, [localStream, peerConnections, roomId, configuration]);
+  }, [localStream, roomId, configuration]);
 
   const handleVideoAnswer = useCallback(async ({ answer, fromUserId }) => {
-    const peerConnection = peerConnections[fromUserId];
+    console.log('Received video answer from user:', fromUserId);
+    const peerConnection = peerConnectionsRef.current[fromUserId];
     if (peerConnection) {
       await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+      console.log('Set remote description for user:', fromUserId);
+    } else {
+      console.error('No peer connection found for user:', fromUserId);
     }
-  }, [peerConnections]);
+  }, []);
 
   const handleIceCandidate = useCallback(async ({ candidate, fromUserId }) => {
-    const peerConnection = peerConnections[fromUserId];
+    console.log('Received ICE candidate from user:', fromUserId);
+    const peerConnection = peerConnectionsRef.current[fromUserId];
     if (peerConnection) {
-      await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+      try {
+        await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+        console.log('Added ICE candidate for user:', fromUserId);
+      } catch (error) {
+        console.error('Error adding ICE candidate:', error);
+      }
+    } else {
+      console.error('No peer connection found for user:', fromUserId);
     }
-  }, [peerConnections]);
+  }, []);
 
   const handleUserVideoJoined = useCallback(({ userId }) => {
     // When another user starts video, create peer connection if we have our stream
@@ -136,14 +167,11 @@ const VideoCall = ({ roomId, currentUser, users }) => {
   }, [currentUser.id, localStream, createPeerConnection]);
 
   const handleUserVideoLeft = useCallback(({ userId }) => {
+    console.log('User left video:', userId);
     // Close peer connection
-    if (peerConnections[userId]) {
-      peerConnections[userId].close();
-      setPeerConnections(prev => {
-        const newPCs = { ...prev };
-        delete newPCs[userId];
-        return newPCs;
-      });
+    if (peerConnectionsRef.current[userId]) {
+      peerConnectionsRef.current[userId].close();
+      delete peerConnectionsRef.current[userId];
     }
 
     // Remove remote stream
@@ -152,7 +180,7 @@ const VideoCall = ({ roomId, currentUser, users }) => {
       delete newStreams[userId];
       return newStreams;
     });
-  }, [peerConnections]);
+  }, []);
 
   useEffect(() => {
     if (!socketService.socket) return;
@@ -220,6 +248,7 @@ const VideoCall = ({ roomId, currentUser, users }) => {
   };
 
   const endCall = () => {
+    console.log('Ending call');
     // Stop all tracks
     if (localStream) {
       localStream.getTracks().forEach(track => track.stop());
@@ -227,8 +256,8 @@ const VideoCall = ({ roomId, currentUser, users }) => {
     }
 
     // Close all peer connections
-    Object.values(peerConnections).forEach(pc => pc.close());
-    setPeerConnections({});
+    Object.values(peerConnectionsRef.current).forEach(pc => pc.close());
+    peerConnectionsRef.current = {};
     setRemoteStreams({});
     setIsCallActive(false);
 
@@ -280,70 +309,160 @@ const VideoCall = ({ roomId, currentUser, users }) => {
     return user ? user.username : 'Unknown';
   };
 
+  const handleMouseDown = (e) => {
+    if (e.target.closest('button') || e.target.closest('video')) return;
+    setIsDragging(true);
+    setDragStart({
+      x: e.clientX - position.x,
+      y: e.clientY - position.y
+    });
+  };
+
+  const handleMouseMove = useCallback((e) => {
+    if (!isDragging) return;
+    
+    const newX = e.clientX - dragStart.x;
+    const newY = e.clientY - dragStart.y;
+    
+    // Keep within viewport bounds
+    const maxX = window.innerWidth - (videoCallRef.current?.offsetWidth || 320);
+    const maxY = window.innerHeight - (videoCallRef.current?.offsetHeight || 400);
+    
+    setPosition({
+      x: Math.max(0, Math.min(newX, maxX)),
+      y: Math.max(0, Math.min(newY, maxY))
+    });
+  }, [isDragging, dragStart]);
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, handleMouseMove]);
+
   if (!isCallActive && Object.keys(remoteStreams).length === 0) {
     return (
-      <div style={{
-        position: 'fixed',
-        bottom: '6rem',
-        right: '2rem',
-        zIndex: 999
-      }}>
-        <button
-          onClick={startCall}
+      <div
+        ref={videoCallRef}
+        style={{
+          position: 'fixed',
+          ...(position.x || position.y ? {
+            top: `${position.y}px`,
+            left: `${position.x}px`,
+            bottom: 'auto',
+            right: 'auto'
+          } : {
+            bottom: '6rem',
+            right: '2rem',
+            top: 'auto',
+            left: 'auto'
+          }),
+          zIndex: 999,
+          transition: isDragging ? 'none' : 'all 0.3s'
+        }}
+      >
+        <div
+          onMouseDown={handleMouseDown}
           style={{
-            padding: '0.875rem 1.5rem',
-            background: 'linear-gradient(135deg, #10b981, #059669)',
-            color: 'white',
-            border: 'none',
-            borderRadius: '0.75rem',
-            fontSize: '0.875rem',
-            fontWeight: '600',
-            cursor: 'pointer',
-            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            transition: 'all 0.3s'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 6px 20px rgba(16, 185, 129, 0.4)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+            cursor: isDragging ? 'grabbing' : 'grab',
+            userSelect: 'none'
           }}
         >
-          <Video size={20} />
-          Start Video Call
-        </button>
+          <button
+            onClick={startCall}
+            style={{
+              padding: '0.875rem 1.5rem',
+              background: 'linear-gradient(135deg, #10b981, #059669)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '0.75rem',
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              transition: 'all 0.3s',
+              pointerEvents: isDragging ? 'none' : 'auto'
+            }}
+            onMouseEnter={(e) => {
+              if (!isDragging) {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(16, 185, 129, 0.4)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+            }}
+          >
+            <Video size={20} />
+            Start Video Call
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{
-      position: 'fixed',
-      bottom: isExpanded ? '1rem' : '1rem',
-      right: isExpanded ? '1rem' : '2rem',
-      width: isExpanded ? 'calc(100vw - 2rem)' : '320px',
-      maxWidth: isExpanded ? '1200px' : '320px',
-      background: 'white',
-      borderRadius: '1rem',
-      boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)',
-      zIndex: 999,
-      overflow: 'hidden',
-      transition: 'all 0.3s'
-    }}>
+    <div
+      ref={videoCallRef}
+      style={{
+        position: 'fixed',
+        ...(isExpanded ? {
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          bottom: 'auto',
+          right: 'auto'
+        } : position.x || position.y ? {
+          top: `${position.y}px`,
+          left: `${position.x}px`,
+          bottom: 'auto',
+          right: 'auto',
+          transform: 'none'
+        } : {
+          bottom: '1rem',
+          right: '2rem',
+          top: 'auto',
+          left: 'auto',
+          transform: 'none'
+        }),
+        width: isExpanded ? 'calc(100vw - 2rem)' : '320px',
+        maxWidth: isExpanded ? '1200px' : '320px',
+        background: 'white',
+        borderRadius: '1rem',
+        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)',
+        zIndex: 999,
+        overflow: 'hidden',
+        transition: isDragging ? 'none' : 'all 0.3s',
+        cursor: isDragging ? 'grabbing' : 'default'
+      }}
+    >
       {/* Header */}
-      <div style={{
-        background: 'linear-gradient(135deg, #667eea, #764ba2)',
-        padding: '0.75rem 1rem',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        color: 'white'
-      }}>
+      <div
+        onMouseDown={handleMouseDown}
+        style={{
+          background: 'linear-gradient(135deg, #667eea, #764ba2)',
+          padding: '0.75rem 1rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          color: 'white',
+          cursor: 'grab',
+          userSelect: 'none'
+        }}
+      >
         <div style={{
           display: 'flex',
           alignItems: 'center',
