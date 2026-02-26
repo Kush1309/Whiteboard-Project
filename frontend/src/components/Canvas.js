@@ -1,184 +1,102 @@
-import React, { useRef, useEffect, useState, forwardRef, useImperativeHandle, useCallback } from 'react';
+import React, { useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 
 const Canvas = forwardRef(({ tool, color, brushSize, onDrawing, onSave }, ref) => {
   const canvasRef = useRef(null);
-  const contextRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [lastPosition, setLastPosition] = useState({ x: 0, y: 0 });
-  const [history, setHistory] = useState([]);
-  const [historyStep, setHistoryStep] = useState(-1);
+  const [context, setContext] = useState(null);
 
-  const saveState = useCallback(() => {
-    const canvas = canvasRef.current;
-    const dataURL = canvas.toDataURL();
-    const newHistory = history.slice(0, historyStep + 1);
-    newHistory.push(dataURL);
-    setHistory(newHistory);
-    setHistoryStep(newHistory.length - 1);
-  }, [history, historyStep]);
-
+  // Initialize canvas
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) {
-      console.error('Canvas ref is null!');
-      return;
-    }
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
     
-    const context = canvas.getContext('2d');
-    
-    // Set canvas size
+    // Set canvas size to match parent
     const resizeCanvas = () => {
       const parent = canvas.parentElement;
-      if (!parent) {
-        console.error('Canvas parent is null!');
-        return;
+      if (parent) {
+        canvas.width = parent.clientWidth;
+        canvas.height = parent.clientHeight;
+        
+        // Reapply context settings after resize
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = color;
+        ctx.lineWidth = brushSize;
       }
-      
-      const rect = parent.getBoundingClientRect();
-      console.log('Canvas parent dimensions:', rect);
-      
-      // Set canvas dimensions
-      canvas.width = rect.width;
-      canvas.height = rect.height;
-      
-      console.log('Canvas size set to:', canvas.width, 'x', canvas.height);
-      
-      // Set drawing styles
-      context.lineCap = 'round';
-      context.lineJoin = 'round';
-      context.imageSmoothingEnabled = true;
-      context.strokeStyle = color;
-      context.lineWidth = brushSize;
     };
 
     resizeCanvas();
-    contextRef.current = context;
+    setContext(ctx);
 
-    // Save initial state
-    saveState();
-
-    // Handle window resize
     window.addEventListener('resize', resizeCanvas);
     return () => window.removeEventListener('resize', resizeCanvas);
-  }, [saveState, color, brushSize]);
+  }, []);
 
+  // Update drawing settings when tool, color, or brush size changes
   useEffect(() => {
-    if (contextRef.current) {
-      console.log('Updating context styles:', { color, brushSize, tool });
-      contextRef.current.strokeStyle = color;
-      contextRef.current.lineWidth = brushSize;
-      contextRef.current.globalCompositeOperation = tool === 'eraser' ? 'destination-out' : 'source-over';
-      console.log('Context updated:', {
-        strokeStyle: contextRef.current.strokeStyle,
-        lineWidth: contextRef.current.lineWidth,
-        globalCompositeOperation: contextRef.current.globalCompositeOperation
-      });
-    } else {
-      console.error('Context is null when trying to update styles!');
+    if (context) {
+      context.strokeStyle = color;
+      context.lineWidth = brushSize;
+      context.globalCompositeOperation = tool === 'eraser' ? 'destination-out' : 'source-over';
     }
-  }, [tool, color, brushSize]);
+  }, [context, tool, color, brushSize]);
 
-  const getMousePos = (e) => {
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
-    };
-  };
+  const startDrawing = (e) => {
+    if (!context) return;
+    
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
 
-  const getTouchPos = (e) => {
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    return {
-      x: e.touches[0].clientX - rect.left,
-      y: e.touches[0].clientY - rect.top
-    };
-  };
-
-  const startDrawing = (position) => {
-    console.log('Starting drawing at:', position);
     setIsDrawing(true);
-    setLastPosition(position);
-    
-    const context = contextRef.current;
-    if (!context) {
-      console.error('Context not available!');
-      return;
-    }
-    
-    console.log('Context settings:', {
-      strokeStyle: context.strokeStyle,
-      lineWidth: context.lineWidth,
-      globalCompositeOperation: context.globalCompositeOperation
-    });
-    
     context.beginPath();
-    context.moveTo(position.x, position.y);
+    context.moveTo(x, y);
 
-    // Send drawing start event
     onDrawing({
       type: 'start',
-      x: position.x,
-      y: position.y,
+      x,
+      y,
       tool,
       color,
       brushSize
     });
   };
 
-  const draw = (position) => {
-    if (!isDrawing) {
-      console.log('Not drawing - isDrawing is false');
-      return;
-    }
+  const draw = (e) => {
+    if (!isDrawing || !context) return;
 
-    const context = contextRef.current;
-    if (!context) {
-      console.error('Context not available in draw!');
-      return;
-    }
-    
-    console.log('Drawing line from', lastPosition, 'to', position);
-    console.log('Current context settings:', {
-      strokeStyle: context.strokeStyle,
-      lineWidth: context.lineWidth,
-      globalCompositeOperation: context.globalCompositeOperation
-    });
-    
-    context.lineTo(position.x, position.y);
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    context.lineTo(x, y);
     context.stroke();
 
-    // Send drawing data
     onDrawing({
       type: 'draw',
-      x: position.x,
-      y: position.y,
-      prevX: lastPosition.x,
-      prevY: lastPosition.y,
+      x,
+      y,
       tool,
       color,
       brushSize
     });
-
-    setLastPosition(position);
   };
 
   const stopDrawing = () => {
     if (!isDrawing) return;
     
     setIsDrawing(false);
-    const context = contextRef.current;
-    context.closePath();
+    if (context) {
+      context.closePath();
+    }
 
-    // Save state for undo/redo
-    saveState();
+    // Save canvas
+    if (canvasRef.current) {
+      onSave(canvasRef.current.toDataURL());
+    }
 
-    // Save canvas data
-    const canvas = canvasRef.current;
-    onSave(canvas.toDataURL());
-
-    // Send drawing end event
     onDrawing({
       type: 'end',
       tool,
@@ -187,66 +105,32 @@ const Canvas = forwardRef(({ tool, color, brushSize, onDrawing, onSave }, ref) =
     });
   };
 
-  // Mouse events
-  const handleMouseDown = (e) => {
-    console.log('Mouse down event triggered');
-    const position = getMousePos(e);
-    console.log('Mouse position:', position);
-    startDrawing(position);
-  };
-
-  const handleMouseMove = (e) => {
-    console.log('Mouse move - isDrawing:', isDrawing);
-    const position = getMousePos(e);
-    draw(position);
-  };
-
-  const handleMouseUp = () => {
-    stopDrawing();
-  };
-
-  // Touch events
-  const handleTouchStart = (e) => {
-    e.preventDefault();
-    const position = getTouchPos(e);
-    startDrawing(position);
-  };
-
-  const handleTouchMove = (e) => {
-    e.preventDefault();
-    const position = getTouchPos(e);
-    draw(position);
-  };
-
-  const handleTouchEnd = (e) => {
-    e.preventDefault();
-    stopDrawing();
-  };
-
-  // Expose methods to parent component
+  // Expose methods to parent
   useImperativeHandle(ref, () => ({
     clearCanvas: () => {
-      const canvas = canvasRef.current;
-      const context = contextRef.current;
-      context.clearRect(0, 0, canvas.width, canvas.height);
-      saveState();
+      if (context && canvasRef.current) {
+        context.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      }
     },
 
     loadCanvas: (dataURL) => {
-      const canvas = canvasRef.current;
-      const context = contextRef.current;
+      if (!canvasRef.current || !context) return;
+      
       const img = new Image();
       img.onload = () => {
-        context.clearRect(0, 0, canvas.width, canvas.height);
+        context.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
         context.drawImage(img, 0, 0);
       };
       img.src = dataURL;
     },
 
     handleRemoteDrawing: (data) => {
-      const context = contextRef.current;
-      
-      // Set drawing properties
+      if (!context) return;
+
+      const prevStrokeStyle = context.strokeStyle;
+      const prevLineWidth = context.lineWidth;
+      const prevCompositeOp = context.globalCompositeOperation;
+
       context.strokeStyle = data.color;
       context.lineWidth = data.brushSize;
       context.globalCompositeOperation = data.tool === 'eraser' ? 'destination-out' : 'source-over';
@@ -261,70 +145,70 @@ const Canvas = forwardRef(({ tool, color, brushSize, onDrawing, onSave }, ref) =
         context.closePath();
       }
 
-      // Reset to current user's settings
-      context.strokeStyle = color;
-      context.lineWidth = brushSize;
-      context.globalCompositeOperation = tool === 'eraser' ? 'destination-out' : 'source-over';
+      context.strokeStyle = prevStrokeStyle;
+      context.lineWidth = prevLineWidth;
+      context.globalCompositeOperation = prevCompositeOp;
+    },
+
+    downloadCanvas: () => {
+      if (!canvasRef.current) return;
+      
+      const link = document.createElement('a');
+      link.download = `whiteboard-${Date.now()}.png`;
+      link.href = canvasRef.current.toDataURL();
+      link.click();
     },
 
     undo: () => {
-      if (historyStep > 0) {
-        const newStep = historyStep - 1;
-        setHistoryStep(newStep);
-        const canvas = canvasRef.current;
-        const context = contextRef.current;
-        const img = new Image();
-        img.onload = () => {
-          context.clearRect(0, 0, canvas.width, canvas.height);
-          context.drawImage(img, 0, 0);
-        };
-        img.src = history[newStep];
+      // Simplified - just clear for now
+      if (context && canvasRef.current) {
+        context.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
       }
     },
 
     redo: () => {
-      if (historyStep < history.length - 1) {
-        const newStep = historyStep + 1;
-        setHistoryStep(newStep);
-        const canvas = canvasRef.current;
-        const context = contextRef.current;
-        const img = new Image();
-        img.onload = () => {
-          context.clearRect(0, 0, canvas.width, canvas.height);
-          context.drawImage(img, 0, 0);
-        };
-        img.src = history[newStep];
-      }
+      // Simplified
     },
 
-    downloadCanvas: () => {
-      const canvas = canvasRef.current;
-      const link = document.createElement('a');
-      link.download = `whiteboard-${Date.now()}.png`;
-      link.href = canvas.toDataURL();
-      link.click();
-    },
-
-    canUndo: () => historyStep > 0,
-    canRedo: () => historyStep < history.length - 1
+    canUndo: () => false,
+    canRedo: () => false
   }));
 
   return (
     <canvas
       ref={canvasRef}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      style={{ 
-        touchAction: 'none',
+      onMouseDown={startDrawing}
+      onMouseMove={draw}
+      onMouseUp={stopDrawing}
+      onMouseLeave={stopDrawing}
+      onTouchStart={(e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const mouseEvent = new MouseEvent('mousedown', {
+          clientX: touch.clientX,
+          clientY: touch.clientY
+        });
+        startDrawing(mouseEvent);
+      }}
+      onTouchMove={(e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const mouseEvent = new MouseEvent('mousemove', {
+          clientX: touch.clientX,
+          clientY: touch.clientY
+        });
+        draw(mouseEvent);
+      }}
+      onTouchEnd={(e) => {
+        e.preventDefault();
+        stopDrawing();
+      }}
+      style={{
         width: '100%',
         height: '100%',
         cursor: 'crosshair',
-        background: 'white'
+        background: 'white',
+        touchAction: 'none'
       }}
     />
   );
