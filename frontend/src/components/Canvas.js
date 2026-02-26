@@ -32,7 +32,7 @@ const Canvas = forwardRef(({ tool, color, brushSize, onDrawing, onSave }, ref) =
 
     window.addEventListener('resize', resizeCanvas);
     return () => window.removeEventListener('resize', resizeCanvas);
-  }, []);
+  }, [color, brushSize]);
 
   // Update drawing settings when tool, color, or brush size changes
   useEffect(() => {
