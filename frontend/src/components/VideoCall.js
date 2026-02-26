@@ -182,6 +182,10 @@ const VideoCall = ({ roomId, currentUser, users }) => {
       setLocalStream(stream);
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
+        // Ensure video plays
+        localVideoRef.current.play().catch(err => {
+          console.error('Error playing local video:', err);
+        });
       }
 
       setIsCallActive(true);
@@ -246,6 +250,16 @@ const VideoCall = ({ roomId, currentUser, users }) => {
       }
     });
   }, [remoteStreams]);
+
+  // Ensure local video plays when stream is set
+  useEffect(() => {
+    if (localStream && localVideoRef.current) {
+      localVideoRef.current.srcObject = localStream;
+      localVideoRef.current.play().catch(err => {
+        console.error('Error playing local video:', err);
+      });
+    }
+  }, [localStream]);
 
   const getUsernameById = (userId) => {
     const user = users.find(u => u.id === userId);
