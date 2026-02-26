@@ -9,8 +9,18 @@ const generateRoomId = () => {
 const validateDrawingData = (data) => {
   if (!data || typeof data !== 'object') return false;
   
-  const requiredFields = ['type', 'x', 'y'];
-  return requiredFields.every(field => data.hasOwnProperty(field));
+  // Check if type exists
+  if (!data.type) return false;
+  
+  // For 'start' and 'draw' types, x and y are required
+  if (data.type === 'start' || data.type === 'draw') {
+    if (typeof data.x !== 'number' || typeof data.y !== 'number') {
+      return false;
+    }
+  }
+  
+  // For 'end' type, x and y are optional
+  return true;
 };
 
 // Sanitize chat message
