@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { roomsAPI } from '../services/api';
 import socketService from '../services/socket';
 import toast from 'react-hot-toast';
@@ -16,6 +17,7 @@ const Whiteboard = () => {
   const { roomId } = useParams();
   const navigate = useNavigate();
   const { user, token } = useAuth();
+  const { isDark } = useTheme();
   const [room, setRoom] = useState(null);
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
@@ -241,7 +243,7 @@ const Whiteboard = () => {
       height: '100vh',
       display: 'flex',
       flexDirection: 'column',
-      background: '#f3f4f6',
+      background: isDark ? '#1f2937' : '#f3f4f6',
       overflow: 'hidden'
     }}>
       {/* Header */}

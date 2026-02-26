@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useTheme } from '../contexts/ThemeContext';
 import { Send, MessageCircle } from 'lucide-react';
 
 const Chat = ({ messages, onSendMessage, currentUser }) => {
   const [message, setMessage] = useState('');
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const { isDark } = useTheme();
 
   useEffect(() => {
     scrollToBottom();
@@ -39,14 +41,15 @@ const Chat = ({ messages, onSendMessage, currentUser }) => {
       {/* Header */}
       <div style={{
         padding: '1rem',
-        borderBottom: '1px solid #e5e7eb'
+        borderBottom: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}`,
+        background: isDark ? '#374151' : 'white'
       }}>
         <div style={{
           display: 'flex',
           alignItems: 'center',
           gap: '0.5rem'
         }}>
-          <MessageCircle size={20} style={{ color: '#6b7280' }} />
+          <MessageCircle size={20} style={{ color: isDark ? '#9ca3af' : '#6b7280' }} />
           <h3 style={{
             fontWeight: '600',
             color: '#111827',

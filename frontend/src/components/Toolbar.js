@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTheme } from '../contexts/ThemeContext';
 import { 
   Pencil, 
   Eraser, 
@@ -26,6 +27,7 @@ const Toolbar = ({
   canRedo = false
 }) => {
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const { isDark } = useTheme();
 
   const colors = [
     '#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF',
@@ -44,7 +46,9 @@ const Toolbar = ({
       flexDirection: 'column',
       padding: '1rem',
       gap: '1rem',
-      width: '5rem'
+      width: '5rem',
+      background: isDark ? '#374151' : 'white',
+      borderRight: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}`
     }}>
       {/* Tools */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -70,7 +74,7 @@ const Toolbar = ({
               title={toolItem.label}
               onMouseEnter={(e) => {
                 if (tool !== toolItem.id) {
-                  e.target.style.background = '#f3f4f6';
+                  e.target.style.background = isDark ? '#4b5563' : '#f3f4f6';
                 }
               }}
               onMouseLeave={(e) => {
@@ -114,8 +118,8 @@ const Toolbar = ({
             left: '100%',
             marginLeft: '0.5rem',
             top: 0,
-            background: 'white',
-            border: '1px solid #e5e7eb',
+            background: isDark ? '#374151' : 'white',
+            border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}`,
             borderRadius: '0.5rem',
             padding: '0.75rem',
             boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
