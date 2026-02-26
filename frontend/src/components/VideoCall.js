@@ -175,7 +175,13 @@ const VideoCall = ({ roomId, currentUser, users }) => {
     };
   }, [handleVideoOffer, handleVideoAnswer, handleIceCandidate, handleUserVideoJoined, handleUserVideoLeft]);
 
-  const startCall = async () => {
+  const startCall = async (watchOnly = false) => {
+    if (watchOnly) {
+      // Watch-only mode: just mark as in call without requesting media
+      setIsCallActive(true);
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: 1280, height: 720 },
@@ -204,7 +210,12 @@ const VideoCall = ({ roomId, currentUser, users }) => {
       });
     } catch (error) {
       console.error('Error accessing media devices:', error);
-      alert('Could not access camera/microphone. Please check permissions.');
+      const errorMessage = error.name === 'NotAllowedError' 
+        ? 'Camera/microphone access denied. Please allow permissions in your browser settings.'
+        : error.name === 'NotFoundError'
+        ? 'No camera or microphone found on your device.'
+        : 'Could not access camera/microphone. Please check your device and browser settings.';
+      alert(errorMessage);
     }
   };
 
@@ -473,43 +484,158 @@ const VideoCall = ({ roomId, currentUser, users }) => {
       <div style={{
         padding: '1rem',
         display: 'flex',
-        justifyContent: 'center',
+        flexDirection: 'column',
+        alignItems: 'center',
         gap: '0.75rem',
         background: '#f9fafb',
         borderTop: '1px solid #e5e7eb'
       }}>
         {!isCallActive ? (
-          // Show "Join Video" button if not in call but there are remote streams
-          <button
-            onClick={startCall}
-            style={{
-              padding: '0.75rem 1.5rem',
-              borderRadius: '9999px',
-              border: 'none',
-              background: 'linear-gradient(135deg, #10b981, #059669)',
-              color: 'white',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.5rem',
-              transition: 'all 0.2s',
-              fontWeight: '600',
-              fontSize: '0.875rem'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'linear-gradient(135deg, #059669, #047857)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'linear-gradient(135deg, #10b981, #059669)';
-            }}
-          >
-            <Video size={18} />
-            Join Video
-          </button>
-        ) : (
-          // Show video controls if in call
+          // Show options if not in call but there are remote streams
           <>
+            <div style={{
+              display: 'flex',
+              gap: '0.75rem',
+              width: '100%',
+              justifyContent: 'center'
+            }}>
+              <button
+                onClick={() => startCall(false)}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '9999px',
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #10b981, #059669)',
+                  color: 'white',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  transition: 'all 0.2s',
+                  fontWeight: '600',
+                  fontSize: '0.875rem',
+                  flex: 1
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #059669, #047857)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+                }}
+              >
+                <Video size={18} />
+                Join with Camera
+              </button>
+              <button
+                onClick={() => startCall(true)}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '9999px',
+                  border: '2px solid #10b981',
+                  background: 'white',
+                  color: '#10b981',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  transition: 'all 0.2s',
+                  fontWeight: '600',
+                  fontSize: '0.875rem',
+                  flex: 1
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#f0fdf4';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'white';
+                }}
+              >
+                <VideoOff size={18} />
+                Watch Only
+              </button>
+            </div>
+            <p style={{
+              fontSize: '0.75rem',
+              color: '#6b7280',
+              margin: 0,
+              textAlign: 'center'
+            }}>
+              Join with camera to share your video, or watch only to see others
+            </p>
+          </>
+        ) : !localStream ? (
+          // Show "Turn on Camera" button if in watch-only mode
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '0.5rem',
+            width: '100%'
+          }}>
+            <button
+              onClick={() => startCall(false)}
+              style={{
+                padding: '0.75rem 1.5rem',
+                borderRadius: '9999px',
+                border: 'none',
+                background: 'linear-gradient(135deg, #10b981, #059669)',
+                color: 'white',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem',
+                transition: 'all 0.2s',
+                fontWeight: '600',
+                fontSize: '0.875rem'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, #059669, #047857)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+              }}
+            >
+              <Video size={18} />
+              Turn on Camera
+            </button>
+            <button
+              onClick={() => setIsCallActive(false)}
+              style={{
+                padding: '0.5rem 1rem',
+                borderRadius: '9999px',
+                border: 'none',
+                background: '#ef4444',
+                color: 'white',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem',
+                transition: 'all 0.2s',
+                fontWeight: '600',
+                fontSize: '0.75rem'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#dc2626';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#ef4444';
+              }}
+            >
+              <PhoneOff size={16} />
+              Leave
+            </button>
+          </div>
+        ) : (
+          // Show video controls if camera is on
+          <div style={{
+            display: 'flex',
+            gap: '0.75rem',
+            justifyContent: 'center'
+          }}>
             <button
               onClick={toggleVideo}
               style={{
@@ -599,7 +725,7 @@ const VideoCall = ({ roomId, currentUser, users }) => {
               <PhoneOff size={18} />
               End Call
             </button>
-          </>
+          </div>
         )}
       </div>
     </div>

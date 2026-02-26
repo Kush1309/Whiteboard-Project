@@ -36,8 +36,8 @@ passport.use(
           username: profile.emails[0].value.split('@')[0] + '_' + Date.now(),
           email: profile.emails[0].value,
           avatar: profile.photos[0]?.value || '',
-          authProvider: 'google',
-          password: Math.random().toString(36).slice(-8) // Random password for Google users
+          authProvider: 'google'
+          // No password field for Google users
         });
 
         await newUser.save();
