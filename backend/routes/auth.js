@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
+const passport = require('../config/passport');
 
 const router = express.Router();
 
@@ -118,5 +119,37 @@ router.get('/me', auth, async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+
+// @route   GET /api/auth/google
+// @desc    Initiate Google OAuth
+// @access  Public
+router.get('/google',
+  passport.authenticate('google', { 
+    scope: ['profile', 'email'],
+    session: false
+  })
+);
+
+// @route   GET /api/auth/google/callback
+// @desc    Google OAuth callback
+// @access  Public
+router.get('/google/callback',
+  passport.authenticate('google', { 
+    session: false,
+    failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3000'}/login`
+  }),
+  (req, res) => {
+    try {
+      // Generate JWT token
+      const token = generateToken(req.user._id);
+      
+      // Redirect to frontend with token
+      res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3000'}/auth/google/callback?token=${token}`);
+    } catch (error) {
+      console.error('Google callback error:', error);
+      res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3000'}/login?error=auth_failed`);
+    }
+  }
+);
 
 module.exports = router;

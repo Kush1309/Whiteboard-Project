@@ -12,6 +12,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Whiteboard from './pages/Whiteboard';
 import InterviewBoard from './pages/InterviewBoard';
+import GoogleCallback from './pages/GoogleCallback';
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/auth/google/callback" element={<GoogleCallback />} />
               <Route
                 path="/dashboard"
                 element={

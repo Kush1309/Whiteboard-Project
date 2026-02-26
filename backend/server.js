@@ -3,11 +3,15 @@ const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const passport = require('passport');
 const connectDB = require('./config/database');
 const socketHandler = require('./socket/socketHandler');
 
 // Load environment variables
 dotenv.config();
+
+// Initialize passport config
+require('./config/passport');
 
 // Connect to MongoDB
 connectDB();
@@ -47,6 +51,7 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
+app.use(passport.initialize());
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));

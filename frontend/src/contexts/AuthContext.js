@@ -101,12 +101,27 @@ export const AuthProvider = ({ children }) => {
     dispatch({ type: 'CLEAR_ERROR' });
   };
 
+  const setAuthData = async (token) => {
+    try {
+      localStorage.setItem('token', token);
+      const response = await authAPI.getCurrentUser();
+      dispatch({
+        type: 'AUTH_SUCCESS',
+        payload: { user: response.data.user, token }
+      });
+    } catch (error) {
+      localStorage.removeItem('token');
+      dispatch({ type: 'LOGOUT' });
+    }
+  };
+
   const value = {
     ...state,
     login,
     register,
     logout,
-    clearError
+    clearError,
+    setAuthData
   };
 
   return (
