@@ -19,18 +19,36 @@ const Canvas = forwardRef(({ tool, color, brushSize, onDrawing, onSave }, ref) =
 
   useEffect(() => {
     const canvas = canvasRef.current;
+    if (!canvas) {
+      console.error('Canvas ref is null!');
+      return;
+    }
+    
     const context = canvas.getContext('2d');
     
     // Set canvas size
     const resizeCanvas = () => {
-      const rect = canvas.parentElement.getBoundingClientRect();
+      const parent = canvas.parentElement;
+      if (!parent) {
+        console.error('Canvas parent is null!');
+        return;
+      }
+      
+      const rect = parent.getBoundingClientRect();
+      console.log('Canvas parent dimensions:', rect);
+      
+      // Set canvas dimensions
       canvas.width = rect.width;
       canvas.height = rect.height;
+      
+      console.log('Canvas size set to:', canvas.width, 'x', canvas.height);
       
       // Set drawing styles
       context.lineCap = 'round';
       context.lineJoin = 'round';
       context.imageSmoothingEnabled = true;
+      context.strokeStyle = color;
+      context.lineWidth = brushSize;
     };
 
     resizeCanvas();
@@ -42,7 +60,7 @@ const Canvas = forwardRef(({ tool, color, brushSize, onDrawing, onSave }, ref) =
     // Handle window resize
     window.addEventListener('resize', resizeCanvas);
     return () => window.removeEventListener('resize', resizeCanvas);
-  }, [saveState]);
+  }, [saveState, color, brushSize]);
 
   useEffect(() => {
     if (contextRef.current) {

@@ -398,16 +398,26 @@ const Whiteboard = () => {
         <div style={{
           flex: 1,
           position: 'relative',
-          background: 'white'
+          background: 'white',
+          minHeight: 0,
+          overflow: 'hidden'
         }}>
-          <Canvas
-            ref={canvasRef}
-            tool={tool}
-            color={color}
-            brushSize={brushSize}
-            onDrawing={handleDrawing}
-            onSave={handleSaveCanvas}
-          />
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0
+          }}>
+            <Canvas
+              ref={canvasRef}
+              tool={tool}
+              color={color}
+              brushSize={brushSize}
+              onDrawing={handleDrawing}
+              onSave={handleSaveCanvas}
+            />
+          </div>
         </div>
 
         {/* Side Panels */}
