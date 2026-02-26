@@ -71,10 +71,22 @@ const Canvas = forwardRef(({ tool, color, brushSize, onDrawing, onSave }, ref) =
   };
 
   const startDrawing = (position) => {
+    console.log('Starting drawing at:', position);
     setIsDrawing(true);
     setLastPosition(position);
     
     const context = contextRef.current;
+    if (!context) {
+      console.error('Context not available!');
+      return;
+    }
+    
+    console.log('Context settings:', {
+      strokeStyle: context.strokeStyle,
+      lineWidth: context.lineWidth,
+      globalCompositeOperation: context.globalCompositeOperation
+    });
+    
     context.beginPath();
     context.moveTo(position.x, position.y);
 
@@ -136,7 +148,9 @@ const Canvas = forwardRef(({ tool, color, brushSize, onDrawing, onSave }, ref) =
 
   // Mouse events
   const handleMouseDown = (e) => {
+    console.log('Mouse down event triggered');
     const position = getMousePos(e);
+    console.log('Mouse position:', position);
     startDrawing(position);
   };
 
@@ -256,7 +270,6 @@ const Canvas = forwardRef(({ tool, color, brushSize, onDrawing, onSave }, ref) =
   return (
     <canvas
       ref={canvasRef}
-      className="w-full h-full cursor-crosshair bg-white dark:bg-gray-100"
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -264,7 +277,13 @@ const Canvas = forwardRef(({ tool, color, brushSize, onDrawing, onSave }, ref) =
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
-      style={{ touchAction: 'none' }}
+      style={{ 
+        touchAction: 'none',
+        width: '100%',
+        height: '100%',
+        cursor: 'crosshair',
+        background: 'white'
+      }}
     />
   );
 });
