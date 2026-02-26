@@ -67,16 +67,17 @@ const VideoCall = ({ roomId, currentUser, users }) => {
   }, [roomId, configuration]);
 
   const handleVideoOffer = useCallback(async ({ offer, fromUserId }) => {
-    if (!localStream) return;
-
     let peerConnection = peerConnections[fromUserId];
     
     if (!peerConnection) {
       peerConnection = new RTCPeerConnection(configuration);
 
-      localStream.getTracks().forEach(track => {
-        peerConnection.addTrack(track, localStream);
-      });
+      // Add local stream tracks if available (send mode)
+      if (localStream) {
+        localStream.getTracks().forEach(track => {
+          peerConnection.addTrack(track, localStream);
+        });
+      }
 
       peerConnection.ontrack = (event) => {
         setRemoteStreams(prev => ({
@@ -127,6 +128,8 @@ const VideoCall = ({ roomId, currentUser, users }) => {
   }, [peerConnections]);
 
   const handleUserVideoJoined = useCallback(({ userId }) => {
+    // When another user starts video, create peer connection if we have our stream
+    // If we don't have a stream, we'll still receive their video when they send an offer
     if (userId !== currentUser.id && localStream) {
       createPeerConnection(userId, localStream);
     }
@@ -266,7 +269,7 @@ const VideoCall = ({ roomId, currentUser, users }) => {
     return user ? user.username : 'Unknown';
   };
 
-  if (!isCallActive) {
+  if (!isCallActive && Object.keys(remoteStreams).length === 0) {
     return (
       <div style={{
         position: 'fixed',
@@ -337,7 +340,7 @@ const VideoCall = ({ roomId, currentUser, users }) => {
         }}>
           <Video size={18} />
           <span style={{ fontSize: '0.875rem', fontWeight: '600' }}>
-            Video Call ({Object.keys(remoteStreams).length + 1} participants)
+            Video Call ({Object.keys(remoteStreams).length + (isCallActive ? 1 : 0)} participants)
           </span>
         </div>
         <button
@@ -370,60 +373,62 @@ const VideoCall = ({ roomId, currentUser, users }) => {
         overflowY: 'auto',
         background: '#1f2937'
       }}>
-        {/* Local Video */}
-        <div style={{
-          position: 'relative',
-          borderRadius: '0.5rem',
-          overflow: 'hidden',
-          background: '#111827',
-          aspectRatio: '16/9'
-        }}>
-          <video
-            ref={localVideoRef}
-            autoPlay
-            muted
-            playsInline
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              transform: 'scaleX(-1)'
-            }}
-          />
+        {/* Local Video - only show if call is active */}
+        {isCallActive && (
           <div style={{
-            position: 'absolute',
-            bottom: '0.5rem',
-            left: '0.5rem',
-            background: 'rgba(0, 0, 0, 0.7)',
-            color: 'white',
-            padding: '0.25rem 0.5rem',
-            borderRadius: '0.25rem',
-            fontSize: '0.75rem',
-            fontWeight: '500'
+            position: 'relative',
+            borderRadius: '0.5rem',
+            overflow: 'hidden',
+            background: '#111827',
+            aspectRatio: '16/9'
           }}>
-            You {!isVideoEnabled && '(Camera Off)'}
-          </div>
-          {!isVideoEnabled && (
+            <video
+              ref={localVideoRef}
+              autoPlay
+              muted
+              playsInline
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                transform: 'scaleX(-1)'
+              }}
+            />
             <div style={{
               position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: '3rem',
-              height: '3rem',
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, #667eea, #764ba2)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              bottom: '0.5rem',
+              left: '0.5rem',
+              background: 'rgba(0, 0, 0, 0.7)',
               color: 'white',
-              fontSize: '1.25rem',
-              fontWeight: '600'
+              padding: '0.25rem 0.5rem',
+              borderRadius: '0.25rem',
+              fontSize: '0.75rem',
+              fontWeight: '500'
             }}>
-              {currentUser.username.charAt(0).toUpperCase()}
+              You {!isVideoEnabled && '(Camera Off)'}
             </div>
-          )}
-        </div>
+            {!isVideoEnabled && (
+              <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: '3rem',
+                height: '3rem',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #667eea, #764ba2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '1.25rem',
+                fontWeight: '600'
+              }}>
+                {currentUser.username.charAt(0).toUpperCase()}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Remote Videos */}
         {Object.entries(remoteStreams).map(([userId, stream]) => (
@@ -473,95 +478,129 @@ const VideoCall = ({ roomId, currentUser, users }) => {
         background: '#f9fafb',
         borderTop: '1px solid #e5e7eb'
       }}>
-        <button
-          onClick={toggleVideo}
-          style={{
-            padding: '0.75rem',
-            borderRadius: '50%',
-            border: 'none',
-            background: isVideoEnabled ? '#f3f4f6' : '#ef4444',
-            color: isVideoEnabled ? '#374151' : 'white',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'all 0.2s',
-            width: '3rem',
-            height: '3rem'
-          }}
-          onMouseEnter={(e) => {
-            if (isVideoEnabled) {
-              e.currentTarget.style.background = '#e5e7eb';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (isVideoEnabled) {
-              e.currentTarget.style.background = '#f3f4f6';
-            }
-          }}
-          title={isVideoEnabled ? 'Turn off camera' : 'Turn on camera'}
-        >
-          {isVideoEnabled ? <Video size={20} /> : <VideoOff size={20} />}
-        </button>
+        {!isCallActive ? (
+          // Show "Join Video" button if not in call but there are remote streams
+          <button
+            onClick={startCall}
+            style={{
+              padding: '0.75rem 1.5rem',
+              borderRadius: '9999px',
+              border: 'none',
+              background: 'linear-gradient(135deg, #10b981, #059669)',
+              color: 'white',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem',
+              transition: 'all 0.2s',
+              fontWeight: '600',
+              fontSize: '0.875rem'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'linear-gradient(135deg, #059669, #047857)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+            }}
+          >
+            <Video size={18} />
+            Join Video
+          </button>
+        ) : (
+          // Show video controls if in call
+          <>
+            <button
+              onClick={toggleVideo}
+              style={{
+                padding: '0.75rem',
+                borderRadius: '50%',
+                border: 'none',
+                background: isVideoEnabled ? '#f3f4f6' : '#ef4444',
+                color: isVideoEnabled ? '#374151' : 'white',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s',
+                width: '3rem',
+                height: '3rem'
+              }}
+              onMouseEnter={(e) => {
+                if (isVideoEnabled) {
+                  e.currentTarget.style.background = '#e5e7eb';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (isVideoEnabled) {
+                  e.currentTarget.style.background = '#f3f4f6';
+                }
+              }}
+              title={isVideoEnabled ? 'Turn off camera' : 'Turn on camera'}
+            >
+              {isVideoEnabled ? <Video size={20} /> : <VideoOff size={20} />}
+            </button>
 
-        <button
-          onClick={toggleAudio}
-          style={{
-            padding: '0.75rem',
-            borderRadius: '50%',
-            border: 'none',
-            background: isAudioEnabled ? '#f3f4f6' : '#ef4444',
-            color: isAudioEnabled ? '#374151' : 'white',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'all 0.2s',
-            width: '3rem',
-            height: '3rem'
-          }}
-          onMouseEnter={(e) => {
-            if (isAudioEnabled) {
-              e.currentTarget.style.background = '#e5e7eb';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (isAudioEnabled) {
-              e.currentTarget.style.background = '#f3f4f6';
-            }
-          }}
-          title={isAudioEnabled ? 'Mute microphone' : 'Unmute microphone'}
-        >
-          {isAudioEnabled ? <Mic size={20} /> : <MicOff size={20} />}
-        </button>
+            <button
+              onClick={toggleAudio}
+              style={{
+                padding: '0.75rem',
+                borderRadius: '50%',
+                border: 'none',
+                background: isAudioEnabled ? '#f3f4f6' : '#ef4444',
+                color: isAudioEnabled ? '#374151' : 'white',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s',
+                width: '3rem',
+                height: '3rem'
+              }}
+              onMouseEnter={(e) => {
+                if (isAudioEnabled) {
+                  e.currentTarget.style.background = '#e5e7eb';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (isAudioEnabled) {
+                  e.currentTarget.style.background = '#f3f4f6';
+                }
+              }}
+              title={isAudioEnabled ? 'Mute microphone' : 'Unmute microphone'}
+            >
+              {isAudioEnabled ? <Mic size={20} /> : <MicOff size={20} />}
+            </button>
 
-        <button
-          onClick={endCall}
-          style={{
-            padding: '0.75rem 1.5rem',
-            borderRadius: '9999px',
-            border: 'none',
-            background: '#ef4444',
-            color: 'white',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.5rem',
-            transition: 'all 0.2s',
-            fontWeight: '600',
-            fontSize: '0.875rem'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#dc2626';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = '#ef4444';
-          }}
-        >
-          <PhoneOff size={18} />
-          End Call
-        </button>
+            <button
+              onClick={endCall}
+              style={{
+                padding: '0.75rem 1.5rem',
+                borderRadius: '9999px',
+                border: 'none',
+                background: '#ef4444',
+                color: 'white',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem',
+                transition: 'all 0.2s',
+                fontWeight: '600',
+                fontSize: '0.875rem'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#dc2626';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#ef4444';
+              }}
+            >
+              <PhoneOff size={18} />
+              End Call
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
