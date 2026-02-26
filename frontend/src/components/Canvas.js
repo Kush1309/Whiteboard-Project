@@ -16,8 +16,14 @@ const Canvas = forwardRef(({ tool, color, brushSize, onDrawing, onSave }, ref) =
     const resizeCanvas = () => {
       const parent = canvas.parentElement;
       if (parent) {
+        // Save current canvas content
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        
         canvas.width = parent.clientWidth;
         canvas.height = parent.clientHeight;
+        
+        // Restore canvas content
+        ctx.putImageData(imageData, 0, 0);
         
         // Reapply context settings after resize
         ctx.lineCap = 'round';
@@ -27,12 +33,15 @@ const Canvas = forwardRef(({ tool, color, brushSize, onDrawing, onSave }, ref) =
       }
     };
 
-    resizeCanvas();
-    setContext(ctx);
+    // Only set context once on mount
+    if (!context) {
+      resizeCanvas();
+      setContext(ctx);
+    }
 
     window.addEventListener('resize', resizeCanvas);
     return () => window.removeEventListener('resize', resizeCanvas);
-  }, [color, brushSize]);
+  }, []); // Remove color and brushSize from dependencies
 
   // Update drawing settings when tool, color, or brush size changes
   useEffect(() => {
